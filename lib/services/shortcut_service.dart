@@ -151,6 +151,19 @@ class ShortcutService {
     }
   }
 
+  /// Buka dialog / halaman izin sistem (mis. "write_settings", "notification_policy", "app_details").
+  Future<bool> requestPermission(String type) async {
+    try {
+      final res = await _channel.invokeMethod<bool>(
+        'requestPermission',
+        {'type': type},
+      ).timeout(const Duration(seconds: 2));
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Ambil info spesifikasi perangkat & status sistem live.
   Future<Map<String, dynamic>> getSystemInfo() async {
     try {

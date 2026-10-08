@@ -9,8 +9,10 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.bluetooth.BluetoothManager
+import android.hardware.camera2.CameraManager
 import android.location.LocationManager
 import android.media.AudioManager
+import android.app.NotificationManager
 import android.net.wifi.WifiManager
 import android.nfc.NfcAdapter
 import android.os.BatteryManager
@@ -31,6 +33,7 @@ class MainActivity : FlutterActivity() {
     private val channelName = "tools/shortcut"
     private val executor = Executors.newCachedThreadPool()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var isTorchOn = false
 
     // Ekstra intent dari pinned shortcut di home screen.
     private var pendingAction: String? = null
@@ -60,6 +63,10 @@ class MainActivity : FlutterActivity() {
                     }
                     "getSystemInfo" -> {
                         result.success(getSystemInfoMap())
+                    }
+                    "requestPermission" -> {
+                        val type = call.argument<String>("type").orEmpty()
+                        result.success(openPermissionSettings(type))
                     }
                     "pingHost" -> {
                         val host = call.argument<String>("host").orEmpty()
@@ -312,8 +319,20 @@ class MainActivity : FlutterActivity() {
             else -> "normal"
         }
 
+        // 8. Auto Rotate
+        val autoRotate = try {
+            Settings.System.getInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
+        } catch (_: Exception) { false }
+
+        val canWrite = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.System.canWrite(this) else true
+        val canDnd = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.isNotificationPolicyAccessGranted == true
+        } else true
+
         return mapOf(
             "hasWriteSecureSettings" to hasWriteSecure,
+            "canWriteSettings" to canWrite,
+            "canAccessNotificationPolicy" to canDnd,
             "private_dns" to dnsActive,
             "private_dns_mode" to dnsMode,
             "private_dns_specifier" to dnsSpecifier,
@@ -323,6 +342,8 @@ class MainActivity : FlutterActivity() {
             "location" to locationActive,
             "nfc" to nfcActive,
             "sound" to ringerMode,
+            "flashlight" to isTorchOn,
+            "auto_rotate" to autoRotate,
         )
     }
 
@@ -332,6 +353,32 @@ class MainActivity : FlutterActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         when (id) {
+            "flashlight" -> {
+                val cm = getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+                val camId = cm?.cameraIdList?.firstOrNull()
+                    ?: return mapOf("success" to false, "error" to "NO_CAMERA")
+                isTorchOn = !isTorchOn
+                return try {
+                    cm.setTorchMode(camId, isTorchOn)
+                    mapOf("success" to true, "state" to isTorchOn, "label" to if (isTorchOn) "Senter Nyala" else "Senter Mati")
+                } catch (e: Exception) {
+                    mapOf("success" to false, "error" to e.message)
+                }
+            }
+            "auto_rotate" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this)) {
+                    openPermissionSettings("write_settings")
+                    return mapOf("success" to false, "needsPermission" to true, "label" to "Izin Diperlukan")
+                }
+                return try {
+                    val current = Settings.System.getInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0)
+                    val next = if (current == 1) 0 else 1
+                    Settings.System.putInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, next)
+                    mapOf("success" to true, "state" to (next == 1), "label" to if (next == 1) "Rotasi Aktif" else "Rotasi Terkunci")
+                } catch (e: Exception) {
+                    mapOf("success" to false, "error" to e.message)
+                }
+            }
             "private_dns" -> {
                 val currentMode = try {
                     Settings.Global.getString(contentResolver, "private_dns_mode") ?: ""
@@ -359,6 +406,20 @@ class MainActivity : FlutterActivity() {
                 }
             }
             "wifi" -> {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    if (wm != null) {
+                        @Suppress("DEPRECATION")
+                        wm.isWifiEnabled = !wm.isWifiEnabled
+                        return mapOf("success" to true, "state" to wm.isWifiEnabled)
+                    }
+                }
+                if (hasWriteSecure) {
+                    val current = Settings.Global.getInt(contentResolver, "wifi_on", 0)
+                    val next = if (current == 1) 0 else 1
+                    Settings.Global.putInt(contentResolver, "wifi_on", next)
+                    return mapOf("success" to true, "state" to (next == 1))
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val panelIntent = Intent(Settings.Panel.ACTION_WIFI).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     if (panelIntent.resolveActivity(packageManager) != null) {
@@ -367,6 +428,25 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 openSettingsChain("android.settings.WIFI_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            "bluetooth" -> {
+                val bm = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+                val adapter = bm?.adapter
+                if (adapter != null) {
+                    try {
+                        if (adapter.isEnabled) {
+                            @Suppress("DEPRECATION")
+                            adapter.disable()
+                            return mapOf("success" to true, "state" to false, "label" to "Bluetooth Nonaktif")
+                        } else {
+                            @Suppress("DEPRECATION")
+                            adapter.enable()
+                            return mapOf("success" to true, "state" to true, "label" to "Bluetooth Aktif")
+                        }
+                    } catch (_: Exception) {}
+                }
+                openSettingsChain("android.settings.BLUETOOTH_SETTINGS", emptyList(), null)
                 return mapOf("success" to true)
             }
             "nfc" -> {
@@ -382,10 +462,14 @@ class MainActivity : FlutterActivity() {
             }
             "sound" -> {
                 val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                val hasDnd = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) nm?.isNotificationPolicyAccessGranted == true else true
                 if (am != null) {
                     val nextMode = when (am.ringerMode) {
                         AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
-                        AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                        AudioManager.RINGER_MODE_VIBRATE -> {
+                            if (hasDnd) AudioManager.RINGER_MODE_SILENT else AudioManager.RINGER_MODE_NORMAL
+                        }
                         else -> AudioManager.RINGER_MODE_NORMAL
                     }
                     try {
@@ -397,12 +481,9 @@ class MainActivity : FlutterActivity() {
                         }
                         return mapOf("success" to true, "label" to label)
                     } catch (_: Exception) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            val panelIntent = Intent(Settings.Panel.ACTION_VOLUME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            if (panelIntent.resolveActivity(packageManager) != null) {
-                                startActivity(panelIntent)
-                                return mapOf("success" to true, "panel" to true)
-                            }
+                        if (!hasDnd && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            openPermissionSettings("notification_policy")
+                            return mapOf("success" to false, "needsPermission" to true)
                         }
                     }
                 }
@@ -425,14 +506,42 @@ class MainActivity : FlutterActivity() {
                 openSettingsChain("android.settings.LOCATION_SOURCE_SETTINGS", emptyList(), null)
                 return mapOf("success" to true)
             }
-            "bluetooth" -> {
-                openSettingsChain("android.settings.BLUETOOTH_SETTINGS", emptyList(), null)
-                return mapOf("success" to true)
-            }
             else -> {
                 return mapOf("success" to false)
             }
         }
+    }
+
+    private fun openPermissionSettings(type: String): Boolean {
+        try {
+            val intent = when (type) {
+                "write_settings" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                            data = Uri.parse("package:$packageName")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    } else Intent(Settings.ACTION_SETTINGS)
+                }
+                "notification_policy" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    } else Intent(Settings.ACTION_SETTINGS)
+                }
+                "app_details" -> {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:$packageName")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                }
+                else -> Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+                return true
+            }
+        } catch (_: Exception) {}
+        return false
     }
 
     // ── Pin to Home Screen (Android 8+) ────────────────────────────────

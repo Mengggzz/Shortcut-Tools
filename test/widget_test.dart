@@ -170,4 +170,19 @@ void main() {
     await tester.tap(toggleIconFinder);
     await tester.pumpAndSettle();
   });
+
+  testWidgets('Tapping permissions icon opens PermissionsSheet',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const ShortcutToolsApp());
+    await tester.pumpAndSettle();
+
+    final permButton = find.byTooltip('Perizinan Sistem & Akses Penuh');
+    expect(permButton, findsOneWidget);
+
+    await tester.tap(permButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Perizinan Sistem & Super-Powers'), findsOneWidget);
+    expect(find.text('WRITE_SECURE_SETTINGS (Akses ADB / Shizuku)'), findsOneWidget);
+  });
 }

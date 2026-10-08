@@ -8,6 +8,7 @@ import '../services/recents_service.dart';
 import '../services/shortcut_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/dns_manager_sheet.dart';
+import '../widgets/permissions_sheet.dart';
 import '../widgets/tool_detail_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -347,6 +348,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('Shortcut Tools'),
         actions: [
+          IconButton(
+            tooltip: 'Perizinan Sistem & Akses Penuh',
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            onPressed: () => PermissionsSheet.show(context),
+          ),
           ListenableBuilder(
             listenable: ThemeService.instance,
             builder: (context, _) => IconButton(
