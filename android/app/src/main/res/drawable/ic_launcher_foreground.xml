@@ -3,17 +3,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Ikon: 4 tombol grid (mewakili pintasan) -->
+    <!-- Outer subtle tech circle ring -->
     <path
-        android:fillColor="#006A60"
-        android:pathData="M28,28h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+        android:strokeColor="#3300E5FF"
+        android:strokeWidth="2.5"
+        android:pathData="M 54,24 A 30,30 0 1,1 53.99,24" />
+
+    <!-- Center dynamic lightning bolt -->
     <path
-        android:fillColor="#006A60"
-        android:pathData="M60,28h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
-    <path
-        android:fillColor="#006A60"
-        android:pathData="M28,60h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+        android:fillColor="#00E5FF"
+        android:pathData="M 58,22 L 40,50 L 52,50 L 42,86 L 70,46 L 56,46 Z" />
+    <!-- Highlighting facet -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M60,60h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+        android:pathData="M 58,22 L 40,50 L 52,50 L 56,46 Z" />
 </vector>
