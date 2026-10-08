@@ -33,6 +33,23 @@ void main() {
         if (call.method == 'getGlobalSetting') {
           return 'hostname';
         }
+        if (call.method == 'getFeatureStates') {
+          return {
+            'hasWriteSecureSettings': false,
+            'private_dns': true,
+            'private_dns_mode': 'hostname',
+            'private_dns_specifier': 'p2.freedns.controld.com',
+            'wifi': true,
+            'bluetooth': false,
+            'battery_saver': false,
+            'location': true,
+            'nfc': false,
+            'sound': 'normal',
+          };
+        }
+        if (call.method == 'toggleFeature') {
+          return {'success': true, 'state': true};
+        }
         if (call.method == 'getTileShortcutId') {
           return null;
         }
@@ -139,5 +156,18 @@ void main() {
     expect(find.text('Control D (Adblock & Tracking)'), findsOneWidget);
     expect(find.text('Control D (Family Friendly)'), findsOneWidget);
     expect(find.text('AdGuard DNS'), findsOneWidget);
+  });
+
+  testWidgets('Tapping icon toggles feature directly',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const ShortcutToolsApp());
+    await tester.pumpAndSettle();
+
+    // Find the tooltip for toggle on the WiFi or Private DNS icon
+    final toggleIconFinder = find.byTooltip('Ketuk untuk toggle Aktif/Nonaktif').first;
+    expect(toggleIconFinder, findsOneWidget);
+
+    await tester.tap(toggleIconFinder);
+    await tester.pumpAndSettle();
   });
 }

@@ -126,6 +126,31 @@ class ShortcutService {
     }
   }
 
+  /// Ambil status aktif/nonaktif dari semua fitur toggleable di sistem.
+  Future<Map<String, dynamic>> getFeatureStates() async {
+    try {
+      final map = await _channel
+          .invokeMapMethod<String, dynamic>('getFeatureStates')
+          .timeout(const Duration(milliseconds: 1500));
+      return map ?? {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Toggle langsung fitur (aktif / nonaktif / floating panel / switch).
+  Future<Map<String, dynamic>> toggleFeature(String id) async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(
+        'toggleFeature',
+        {'id': id},
+      ).timeout(const Duration(seconds: 3));
+      return res ?? {'success': false};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   /// Ambil info spesifikasi perangkat & status sistem live.
   Future<Map<String, dynamic>> getSystemInfo() async {
     try {

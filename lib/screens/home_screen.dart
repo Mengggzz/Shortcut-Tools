@@ -17,21 +17,74 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _query = '';
   String _category = 'Semua';
   String? _tileId;
   List<String> _favIds = [];
   List<String> _recentIds = [];
+  Map<String, dynamic> _featureStates = {};
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _handlePinnedLaunch();
     _loadTileId();
     _loadFavs();
     _loadRecents();
+    _loadFeatureStates();
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOnboarding());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadFeatureStates();
+    }
+  }
+
+  Future<void> _loadFeatureStates() async {
+    final states = await ShortcutService.instance.getFeatureStates();
+    if (mounted) {
+      setState(() => _featureStates = states);
+    }
+  }
+
+  Future<void> _toggleFeature(ToolShortcut s) async {
+    HapticFeedback.mediumImpact();
+    final res = await ShortcutService.instance.toggleFeature(s.id);
+    if (!mounted) return;
+
+    if (res['needsPermission'] == true) {
+      if (s.id == 'private_dns') {
+        _onCardTap(s);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Buka pengaturan untuk mengubah "${s.title}"'),
+            action: SnackBarAction(
+              label: 'Buka',
+              onPressed: () => _open(s),
+            ),
+          ),
+        );
+      }
+    } else if (res['label'] != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${s.title}: ${res['label']}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    await _loadFeatureStates();
   }
 
   /// Tampilkan petunjuk gestur sekali saja di peluncuran pertama.
@@ -380,14 +433,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisCount: 3,
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 0.82,
+                      childAspectRatio: 0.80,
                     ),
                     itemCount: _filtered.length,
                     itemBuilder: (_, i) => _ToolCard(
                       shortcut: _filtered[i],
                       isTile: _tileId == _filtered[i].id,
                       isFav: _favIds.contains(_filtered[i].id),
+                      featureState: _featureStates[_filtered[i].id],
                       onTap: () => _onCardTap(_filtered[i]),
+                      onToggle: () => _toggleFeature(_filtered[i]),
                       onLongPress: () => _showActions(_filtered[i]),
                     ),
                   ),
@@ -414,7 +469,9 @@ class _HomeScreenState extends State<HomeScreen> {
             shortcut: items[i],
             isTile: _tileId == items[i].id,
             isFav: _favIds.contains(items[i].id),
+            featureState: _featureStates[items[i].id],
             onTap: () => _onCardTap(items[i]),
+            onToggle: () => _toggleFeature(items[i]),
             onLongPress: () => _showActions(items[i]),
           ),
         ),
@@ -455,18 +512,22 @@ class _StripHeader extends StatelessWidget {
 }
 
 /// Kartu tool: ikon + judul + deskripsi singkat.
-/// Tap = buka langsung, tahan = menu aksi.
+/// Tap ikon = toggle aktif/nonaktif, tap kartu = buka aksi/detail.
 class _ToolCard extends StatelessWidget {
   final ToolShortcut shortcut;
   final bool isTile;
   final bool isFav;
+  final dynamic featureState;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback onToggle;
 
   const _ToolCard({
     required this.shortcut,
     required this.onTap,
     required this.onLongPress,
+    required this.onToggle,
+    this.featureState,
     this.isTile = false,
     this.isFav = false,
   });
@@ -474,6 +535,10 @@ class _ToolCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final bool hasState = featureState != null;
+    final bool isActive = featureState == true ||
+        (featureState is String && featureState != 'silent' && featureState != 'off');
+
     return InkWell(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -489,23 +554,62 @@ class _ToolCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
+          border: isActive && hasState
+              ? Border.all(color: Colors.teal.withValues(alpha: 0.6), width: 1.5)
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    shortcut.icon,
-                    size: 24,
-                    color: scheme.onPrimaryContainer,
+                // Interactive Icon Container (Tap to toggle)
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    onToggle();
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Tooltip(
+                    message: 'Ketuk untuk toggle Aktif/Nonaktif',
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isActive && hasState
+                            ? Colors.teal.withValues(alpha: 0.2)
+                            : scheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(14),
+                        border: isActive && hasState
+                            ? Border.all(color: Colors.teal, width: 1.5)
+                            : null,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(
+                            shortcut.icon,
+                            size: 24,
+                            color: isActive && hasState
+                                ? Colors.teal
+                                : scheme.onPrimaryContainer,
+                          ),
+                          if (hasState)
+                            Positioned(
+                              right: 4,
+                              top: 4,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isActive ? Colors.greenAccent : Colors.grey,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -518,14 +622,20 @@ class _ToolCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              shortcut.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    shortcut.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 2),
             Expanded(
@@ -538,7 +648,38 @@ class _ToolCard extends StatelessWidget {
                     ),
               ),
             ),
-            if (shortcut.globalKey != null)
+            if (hasState) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isActive ? Colors.green : Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        featureState is String
+                            ? featureState.toString().toUpperCase()
+                            : (isActive ? 'AKTIF' : 'NONAKTIF'),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? Colors.green : Colors.grey,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (shortcut.globalKey != null)
               _LiveDot(keyName: shortcut.globalKey!),
           ],
         ),

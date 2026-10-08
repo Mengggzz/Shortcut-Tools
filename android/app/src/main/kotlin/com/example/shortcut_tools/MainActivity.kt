@@ -8,10 +8,16 @@ import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.net.Uri
+import android.bluetooth.BluetoothManager
+import android.location.LocationManager
+import android.media.AudioManager
+import android.net.wifi.WifiManager
+import android.nfc.NfcAdapter
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -70,6 +76,13 @@ class MainActivity : FlutterActivity() {
                         val hostname = call.argument<String>("hostname")
                         val res = applyPrivateDns(mode, hostname)
                         result.success(res)
+                    }
+                    "getFeatureStates" -> {
+                        result.success(getFeatureStatesMap())
+                    }
+                    "toggleFeature" -> {
+                        val id = call.argument<String>("id").orEmpty()
+                        result.success(toggleFeatureDirect(id))
                     }
                     "pinShortcut" -> {
                         val id = call.argument<String>("id").orEmpty()
@@ -244,6 +257,181 @@ class MainActivity : FlutterActivity() {
             mapOf("success" to true)
         } catch (e: Exception) {
             mapOf("success" to false, "error" to e.javaClass.simpleName, "message" to e.message)
+        }
+    }
+
+    private fun getFeatureStatesMap(): Map<String, Any?> {
+        val hasWriteSecure = checkCallingOrSelfPermission(
+            Manifest.permission.WRITE_SECURE_SETTINGS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        // 1. Private DNS
+        val dnsMode = try {
+            Settings.Global.getString(contentResolver, "private_dns_mode") ?: ""
+        } catch (_: Exception) { "" }
+        val dnsSpecifier = try {
+            Settings.Global.getString(contentResolver, "private_dns_specifier") ?: ""
+        } catch (_: Exception) { "" }
+        val dnsActive = dnsMode.isNotEmpty() && dnsMode != "off"
+
+        // 2. WiFi
+        val wifiActive = try {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            wm?.isWifiEnabled ?: (Settings.Global.getInt(contentResolver, "wifi_on", 0) != 0)
+        } catch (_: Exception) { false }
+
+        // 3. Bluetooth
+        val btActive = try {
+            val bm = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            bm?.adapter?.isEnabled ?: false
+        } catch (_: Exception) { false }
+
+        // 4. Battery Saver
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val batterySaverActive = pm?.isPowerSaveMode ?: false
+
+        // 5. Location (GPS)
+        val lm = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        val locationActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            lm?.isLocationEnabled ?: false
+        } else {
+            try {
+                Settings.Secure.getInt(contentResolver, Settings.Secure.LOCATION_MODE) != Settings.Secure.LOCATION_MODE_OFF
+            } catch (_: Exception) { false }
+        }
+
+        // 6. NFC
+        val nfcAdapter = try { NfcAdapter.getDefaultAdapter(this) } catch (_: Exception) { null }
+        val nfcActive = nfcAdapter?.isEnabled ?: false
+
+        // 7. Sound Ringer Mode
+        val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        val ringerMode = when (am?.ringerMode) {
+            AudioManager.RINGER_MODE_SILENT -> "silent"
+            AudioManager.RINGER_MODE_VIBRATE -> "vibrate"
+            else -> "normal"
+        }
+
+        return mapOf(
+            "hasWriteSecureSettings" to hasWriteSecure,
+            "private_dns" to dnsActive,
+            "private_dns_mode" to dnsMode,
+            "private_dns_specifier" to dnsSpecifier,
+            "wifi" to wifiActive,
+            "bluetooth" to btActive,
+            "battery_saver" to batterySaverActive,
+            "location" to locationActive,
+            "nfc" to nfcActive,
+            "sound" to ringerMode,
+        )
+    }
+
+    private fun toggleFeatureDirect(id: String): Map<String, Any?> {
+        val hasWriteSecure = checkCallingOrSelfPermission(
+            Manifest.permission.WRITE_SECURE_SETTINGS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        when (id) {
+            "private_dns" -> {
+                val currentMode = try {
+                    Settings.Global.getString(contentResolver, "private_dns_mode") ?: ""
+                } catch (_: Exception) { "" }
+                val currentSpec = try {
+                    Settings.Global.getString(contentResolver, "private_dns_specifier") ?: ""
+                } catch (_: Exception) { "" }
+
+                if (hasWriteSecure) {
+                    return try {
+                        if (currentMode == "off" || currentMode.isEmpty()) {
+                            val targetSpec = if (currentSpec.isNotBlank()) currentSpec else "p2.freedns.controld.com"
+                            Settings.Global.putString(contentResolver, "private_dns_mode", "hostname")
+                            Settings.Global.putString(contentResolver, "private_dns_specifier", targetSpec)
+                            mapOf("success" to true, "state" to true, "label" to targetSpec)
+                        } else {
+                            Settings.Global.putString(contentResolver, "private_dns_mode", "off")
+                            mapOf("success" to true, "state" to false, "label" to "Mati")
+                        }
+                    } catch (e: Exception) {
+                        mapOf("success" to false, "error" to e.message)
+                    }
+                } else {
+                    return mapOf("success" to false, "needsPermission" to true)
+                }
+            }
+            "wifi" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val panelIntent = Intent(Settings.Panel.ACTION_WIFI).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (panelIntent.resolveActivity(packageManager) != null) {
+                        startActivity(panelIntent)
+                        return mapOf("success" to true, "panel" to true)
+                    }
+                }
+                openSettingsChain("android.settings.WIFI_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            "nfc" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val panelIntent = Intent(Settings.Panel.ACTION_NFC).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (panelIntent.resolveActivity(packageManager) != null) {
+                        startActivity(panelIntent)
+                        return mapOf("success" to true, "panel" to true)
+                    }
+                }
+                openSettingsChain("android.settings.NFC_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            "sound" -> {
+                val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                if (am != null) {
+                    val nextMode = when (am.ringerMode) {
+                        AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                        AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                        else -> AudioManager.RINGER_MODE_NORMAL
+                    }
+                    try {
+                        am.ringerMode = nextMode
+                        val label = when (nextMode) {
+                            AudioManager.RINGER_MODE_SILENT -> "Hening (Silent)"
+                            AudioManager.RINGER_MODE_VIBRATE -> "Getar (Vibrate)"
+                            else -> "Normal (Suara Aktif)"
+                        }
+                        return mapOf("success" to true, "label" to label)
+                    } catch (_: Exception) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            val panelIntent = Intent(Settings.Panel.ACTION_VOLUME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            if (panelIntent.resolveActivity(packageManager) != null) {
+                                startActivity(panelIntent)
+                                return mapOf("success" to true, "panel" to true)
+                            }
+                        }
+                    }
+                }
+                openSettingsChain("android.settings.SOUND_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            "battery_saver" -> {
+                if (hasWriteSecure) {
+                    val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    val isLow = pm?.isPowerSaveMode ?: false
+                    try {
+                        Settings.Global.putInt(contentResolver, "low_power", if (isLow) 0 else 1)
+                        return mapOf("success" to true, "state" to !isLow)
+                    } catch (_: Exception) {}
+                }
+                openSettingsChain("android.settings.BATTERY_SAVER_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            "location" -> {
+                openSettingsChain("android.settings.LOCATION_SOURCE_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            "bluetooth" -> {
+                openSettingsChain("android.settings.BLUETOOTH_SETTINGS", emptyList(), null)
+                return mapOf("success" to true)
+            }
+            else -> {
+                return mapOf("success" to false)
+            }
         }
     }
 
