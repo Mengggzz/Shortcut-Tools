@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ph-bg: #f3f1ec; --ph-text: #1a1c1e; --ph-sub: #5f6368;
+    --ph-appbar: #006a60; --ph-chip: #e8eaed;
+    --ph-card: #e6e1d5; --ph-tile: #c8f5ee; --ph-ontile: #004f47; --ph-line: #e2e2e2;
+  }
+  .phone[data-ptheme="dark"] {
+    --ph-bg: #141414; --ph-text: #e8eaed; --ph-sub: #9aa0a6;
+    --ph-appbar: #004f47; --ph-chip: #2c2c2c;
+    --ph-card: #2b2b2b; --ph-tile: #0b3d38; --ph-ontile: #c8f5ee; --ph-line: #333;
+  }
+  body {
+    font-family: Roboto, system-ui, sans-serif;
+    background: var(--hatch-widget-bg); color: var(--hatch-widget-text);
+    display: flex; justify-content: center; padding: 8px;
+    -webkit-user-select: none; user-select: none;
+  }
+  .wrap { width: 100%; max-width: 400px; }
+  .phone {
+    position: relative; border-radius: 28px; overflow: hidden;
+    border: 1px solid var(--hatch-widget-border);
+    background: var(--ph-bg); color: var(--ph-text);
+    box-shadow: var(--hatch-widget-shadow);
+  }
+  .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px 4px; font-size: 12px; font-weight: 600; }
+  .appbar { background: var(--ph-appbar); color: #fff; padding: 14px 18px; font-size: 20px; font-weight: 500; display: flex; align-items: center; }
+  .appbar .sp { flex: 1; }
+  .appbar button { background: none; border: none; color: #fff; cursor: pointer; padding: 4px; display: flex; }
+  .search { padding: 12px 16px 4px; }
+  .searchbox { display: flex; align-items: center; gap: 8px; background: var(--hatch-widget-surface); border: 1px solid var(--ph-line); border-radius: 12px; padding: 10px 12px; }
+  .searchbox input { border: none; outline: none; background: transparent; flex: 1; font-size: 14px; color: var(--ph-text); }
+  .searchbox input::placeholder { color: var(--ph-sub); }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; padding: 7px 14px; border-radius: 16px; font-size: 13px; background: var(--ph-chip); color: var(--ph-text); border: none; cursor: pointer; }
+  .chip.on { background: var(--ph-appbar); color: #fff; }
+  .scroll { max-height: 460px; overflow-y: auto; }
+  .striphead { display: flex; align-items: center; gap: 6px; padding: 8px 18px 0; font-size: 13px; font-weight: 600; }
+  .striphead .sp { flex: 1; }
+  .striphead button { border: none; background: none; color: var(--ph-appbar); font-size: 12px; cursor: pointer; }
+  .strip { display: flex; gap: 10px; overflow-x: auto; padding: 8px 16px; scrollbar-width: none; }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip .card { flex: 0 0 124px; }
+  .sechead { padding: 10px 18px 8px; font-size: 13px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 16px 24px; }
+  .card {
+    background: var(--ph-card); border-radius: 20px; padding: 12px; cursor: pointer;
+    display: flex; flex-direction: column; min-height: 148px;
+  }
+  .card:active { opacity: .85; }
+  .toprow { display: flex; align-items: flex-start; }
+  .ic {
+    width: 44px; height: 44px; border-radius: 14px;
+    background: var(--ph-tile); color: var(--ph-ontile);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sp { flex: 1; }
+  .mk { display: flex; gap: 4px; align-items: center; }
+  .t { font-size: 13.5px; font-weight: 600; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .d { font-size: 11.5px; color: var(--ph-sub); margin-top: 2px; line-height: 1.35; flex: 1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .livedot { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 10.5px; color: var(--ph-sub); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+  .isvg { width: 26px; height: 26px; fill: currentColor; flex: 0 0 auto; }
+  .isvg.sm { width: 18px; height: 18px; }
+  .isvg.xs { width: 14px; height: 14px; }
+  .tilebadge svg, .starbadge svg { width: 13px; height: 13px; }
+  #themeBtn svg { width: 22px; height: 22px; }
+  .star { color: #d99a00; }
+  .tileic { color: var(--ph-appbar); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 50; display: none; background: var(--hatch-widget-surface); border-top: 1px solid var(--ph-line); border-radius: 20px 20px 0 0; padding: 8px 0 18px; }
+  .sheet.open { display: block; }
+  .sheet button { display: flex; align-items: center; gap: 14px; width: 100%; background: none; border: none; padding: 13px 20px; font-size: 14.5px; color: var(--ph-text); cursor: pointer; text-align: left; }
+  .sheet button:hover { background: var(--ph-chip); }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.35); display: none; z-index: 40; }
+  .scrim.open { display: block; }
+  .toast { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); background: #323232; color: #fff; font-size: 13px; padding: 10px 16px; border-radius: 10px; display: none; z-index: 60; max-width: 88%; text-align: center; }
+  .toast.show { display: block; }
+  .onb { position: absolute; inset: 0; z-index: 70; display: none; align-items: flex-end; background: rgba(0,0,0,.45); }
+  .onb.open { display: flex; }
+  .onbcard { background: var(--hatch-widget-surface); border-radius: 20px 20px 0 0; padding: 22px 22px 26px; width: 100%; }
+  .onbcard h3 { font-size: 18px; margin-bottom: 12px; }
+  .onbrow { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; font-size: 13.5px; }
+  .onbrow svg { color: var(--ph-appbar); }
+  .onbbtn { width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 12px; background: var(--ph-appbar); color: #fff; font-size: 15px; cursor: pointer; }
+  .cap { text-align: center; font-size: 12px; color: var(--hatch-widget-muted); padding: 10px 4px 2px; }
+  .empty { grid-column: 1 / -1; text-align: center; color: var(--ph-sub); padding: 30px; font-size: 14px; }
+  hr.div { border: none; border-top: 1px solid var(--ph-line); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="phone" id="phone">
+    <div class="statusbar"><span>06:52</span><svg class="isvg sm" viewBox="0 0 24 24"><path d="M12,3C7.79,3 3.7,4.41 0.38,7C4.41,12.06 7.89,16.37 12,21.5C16.08,16.42 20.24,11.24 23.65,7C20.32,4.41 16.22,3 12,3Z"/></svg><svg class="isvg sm" viewBox="0 0 24 24"><path d="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z"/></svg></div>
+    <div class="appbar">Shortcut Tools<div class="sp"></div><button id="themeBtn" aria-label="tema"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z"/></svg></button></div>
+    <div class="search">
+      <div class="searchbox"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg><input id="q" placeholder="Cari pengaturan… (mis. dns)"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="scroll">
+      <div id="recentsec"></div>
+      <div id="favsec"></div>
+      <div class="sechead">Semua</div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="scrim" id="scrim"></div>
+    <div class="sheet" id="sheet">
+      <button id="sOpen"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/></svg><span id="sOpenT">Buka</span></button>
+      <button id="sFav"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M12,15.39L8.24,17.66L9.23,13.38L5.91,10.5L10.29,10.13L12,6.09L13.71,10.13L18.09,10.5L14.77,13.38L15.76,17.66M22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.45,13.97L5.82,21L12,17.27L18.18,21L16.54,13.97L22,9.24Z"/></svg><span id="sFavT">Tambah ke Favorit</span></button>
+      <button id="sPin"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12M8.8,14L10,12.8V4H14V12.8L15.2,14H8.8Z"/></svg>Pin ke Home Screen</button>
+      <button id="sTile"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M3,3H11V7.34L16.66,1.69L22.31,7.34L16.66,13H21V21H13V13H16.66L11,7.34V11H3V3M3,13H11V21H3V13Z"/></svg>Jadikan Quick Tile</button>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="onb" id="onb">
+      <div class="onbcard">
+        <h3>Selamat datang di Shortcut Tools</h3>
+        <div class="onbrow"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M11,5A4,4 0 0,1 15,9C15,10.5 14.2,11.77 13,12.46V11.24C13.61,10.69 14,9.89 14,9A3,3 0 0,0 11,6A3,3 0 0,0 8,9C8,9.89 8.39,10.69 9,11.24V12.46C7.8,11.77 7,10.5 7,9A4,4 0 0,1 11,5Z"/></svg><span>Ketuk kartu untuk langsung membuka halaman pengaturannya.</span></div>
+        <div class="onbrow"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M11,5A4,4 0 0,1 15,9C15,10.5 14.2,11.77 13,12.46V11.24C13.61,10.69 14,9.89 14,9A3,3 0 0,0 11,6A3,3 0 0,0 8,9C8,9.89 8.39,10.69 9,11.24V12.46C7.8,11.77 7,10.5 7,9A4,4 0 0,1 11,5Z"/></svg><span>Tahan kartu untuk menu: favorit, pin ke Home Screen, Quick Tile.</span></div>
+        <div class="onbrow"><svg class="isvg sm" viewBox="0 0 24 24"><path d="M12,15.39L8.24,17.66L9.23,13.38L5.91,10.5L10.29,10.13L12,6.09L13.71,10.13L18.09,10.5L14.77,13.38L15.76,17.66M22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.45,13.97L5.82,21L12,17.27L18.18,21L16.54,13.97L22,9.24Z"/></svg><span>Yang sering dipakai otomatis naik ke "Terakhir dibuka".</span></div>
+        <button class="onbbtn" id="onbOk">Mengerti</button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">Tap kartu = buka (masuk "Terakhir dibuka"). Tahan kartu = menu. Coba juga pencarian & chip.</div>
+</div>
+<script>
+(function(){
+  var HW = window.hatchWidget || null;
+  var S = { q: '', cat: 'Semua', favs: [], recents: [], ptheme: 'light', onboarded: false };
+  try { S = HW.getState(S) || S; } catch(e){}
+  if (!S.favs) S.favs = [];
+  if (!S.recents) S.recents = [];
+  if (!S.ptheme) S.ptheme = 'light';
+  function save(){ try { HW.setState(S); } catch(e){} }
+
+  if (!S.onboarded) document.getElementById('onb').classList.add('open');
+  document.getElementById('onbOk').onclick = function(){
+    S.onboarded = true; save();
+    document.getElementById('onb').classList.remove('open');
+  };
+
+  function applyTheme(){
+    document.getElementById('phone').dataset.ptheme = S.ptheme;
+    document.getElementById('themeIcon').innerHTML = S.ptheme === 'dark' ? ICONS.light_mode : ICONS.dark_mode;
+  }
+  document.getElementById('themeBtn').onclick = function(){
+    S.ptheme = S.ptheme === 'dark' ? 'light' : 'dark';
+    save(); applyTheme();
+    toast(S.ptheme === 'dark' ? 'Mode gelap aktif' : 'Mode terang aktif');
+  };
+
+  var DATA = [
+    {icon:'wifi', title:'WiFi', desc:'Hubungkan & kelola jaringan WiFi', cat:'Jaringan'},
+    {icon:'dns', title:'Private DNS', desc:'DNS terenkripsi (DoT)', cat:'Jaringan', live:'Otomatis'},
+    {icon:'data_usage', title:'Penggunaan Data', desc:'Pantau kuota & pemakaian data', cat:'Jaringan'},
+    {icon:'bluetooth', title:'Bluetooth', desc:'Pairing perangkat Bluetooth', cat:'Jaringan'},
+    {icon:'nfc', title:'NFC', desc:'Pembayaran & berbagi via NFC', cat:'Jaringan'},
+    {icon:'vpn_key', title:'VPN', desc:'Kelola profil VPN', cat:'Jaringan'},
+    {icon:'brightness_6', title:'Layar', desc:'Kecerahan & timeout layar', cat:'Perangkat'},
+    {icon:'volume_up', title:'Suara', desc:'Volume & nada dering', cat:'Perangkat'},
+    {icon:'battery_saver', title:'Penghemat Baterai', desc:'Mode hemat daya sistem', cat:'Perangkat'},
+    {icon:'storage', title:'Penyimpanan', desc:'Ruang internal & kartu SD', cat:'Perangkat'},
+    {icon:'apps', title:'Semua Aplikasi', desc:'Kelola aplikasi terinstal', cat:'Aplikasi'},
+    {icon:'info', title:'Info Aplikasi Ini', desc:'Izin & penyimpanan app ini', cat:'Aplikasi'},
+    {icon:'notifications_active', title:'Akses Notifikasi', desc:'App yang boleh baca notifikasi', cat:'Aplikasi'},
+    {icon:'cast', title:'Cast', desc:'Transmisi ke TV/Chromecast', cat:'Aplikasi'},
+    {icon:'location_on', title:'Lokasi', desc:'GPS & layanan lokasi', cat:'Sistem'},
+    {icon:'access_time', title:'Tanggal & Waktu', desc:'Zona waktu & format jam', cat:'Sistem'},
+    {icon:'language', title:'Bahasa', desc:'Bahasa sistem & input', cat:'Sistem'},
+    {icon:'smartphone', title:'Tentang Ponsel', desc:'Info perangkat & Android', cat:'Sistem'},
+    {icon:'print', title:'Pencetakan', desc:'Layanan print & printer', cat:'Sistem'}
+  ];
+  var CATS = ['Semua','Jaringan','Perangkat','Aplikasi','Sistem'];
+  var tileTitle = null, sheetFor = null, pressTimer = null;
+var ICONS = {
+    access_time: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z"/></svg>',
+    apps: '<svg class="isvg" viewBox="0 0 24 24"><path d="M16,20H20V16H16M16,14H20V10H16M10,8H14V4H10M16,8H20V4H16M10,14H14V10H10M4,14H8V10H4M4,20H8V16H4M10,20H14V16H10M4,8H8V4H4V8Z"/></svg>',
+    battery_full: '<svg class="isvg" viewBox="0 0 24 24"><path d="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z"/></svg>',
+    battery_saver: '<svg class="isvg" viewBox="0 0 24 24"><path d="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.66C6,21.4 6.6,22 7.33,22H16.66C17.4,22 18,21.4 18,20.67V5.33C18,4.6 17.4,4 16.67,4M11,20V14.5H9L13,7V12.5H15"/></svg>',
+    bluetooth: '<svg class="isvg" viewBox="0 0 24 24"><path d="M14.88,16.29L13,18.17V14.41M13,5.83L14.88,7.71L13,9.58M17.71,7.71L12,2H11V9.58L6.41,5L5,6.41L10.59,12L5,17.58L6.41,19L11,14.41V22H12L17.71,16.29L13.41,12L17.71,7.71Z"/></svg>',
+    brightness_6: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,18V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18M20,15.31L23.31,12L20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31Z"/></svg>',
+    cast: '<svg class="isvg" viewBox="0 0 24 24"><path d="M1,10V12A9,9 0 0,1 10,21H12C12,14.92 7.07,10 1,10M1,14V16A5,5 0 0,1 6,21H8A7,7 0 0,0 1,14M1,18V21H4A3,3 0 0,0 1,18M21,3H3C1.89,3 1,3.89 1,5V8H3V5H21V19H14V21H21A2,2 0 0,0 23,19V5C23,3.89 22.1,3 21,3Z"/></svg>',
+    dark_mode: '<svg class="isvg" viewBox="0 0 24 24"><path d="M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z"/></svg>',
+    data_usage: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,3C7.58,3 4,4.79 4,7C4,9.21 7.58,11 12,11C16.42,11 20,9.21 20,7C20,4.79 16.42,3 12,3M4,9V12C4,14.21 7.58,16 12,16C16.42,16 20,14.21 20,12V9C20,11.21 16.42,13 12,13C7.58,13 4,11.21 4,9M4,14V17C4,19.21 7.58,21 12,21C16.42,21 20,19.21 20,17V14C20,16.21 16.42,18 12,18C7.58,18 4,16.21 4,14Z"/></svg>',
+    dns: '<svg class="isvg" viewBox="0 0 24 24"><path d="M7,9A2,2 0 0,1 5,7A2,2 0 0,1 7,5A2,2 0 0,1 9,7A2,2 0 0,1 7,9M20,3H4A1,1 0 0,0 3,4V10A1,1 0 0,0 4,11H20A1,1 0 0,0 21,10V4A1,1 0 0,0 20,3M7,19A2,2 0 0,1 5,17A2,2 0 0,1 7,15A2,2 0 0,1 9,17A2,2 0 0,1 7,19M20,13H4A1,1 0 0,0 3,14V20A1,1 0 0,0 4,21H20A1,1 0 0,0 21,20V14A1,1 0 0,0 20,13Z"/></svg>',
+    history: '<svg class="isvg" viewBox="0 0 24 24"><path d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3"/></svg>',
+    info: '<svg class="isvg" viewBox="0 0 24 24"><path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"/></svg>',
+    language: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12.87,15.07L10.33,12.56L10.36,12.53C12.1,10.59 13.34,8.36 14.07,6H17V4H10V2H8V4H1V6H12.17C11.5,7.92 10.44,9.75 9,11.35C8.07,10.32 7.3,9.19 6.69,8H4.69C5.42,9.63 6.42,11.17 7.67,12.56L2.58,17.58L4,19L9,14L12.11,17.11L12.87,15.07M18.5,10H16.5L12,22H14L15.12,19H19.87L21,22H23L18.5,10M15.88,17L17.5,12.67L19.12,17H15.88Z"/></svg>',
+    light_mode: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M3.36,17L5.12,13.23C5.26,14 5.53,14.78 5.95,15.5C6.37,16.24 6.91,16.86 7.5,17.37L3.36,17M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M20.64,17L16.5,17.36C17.09,16.85 17.62,16.22 18.04,15.5C18.46,14.77 18.73,14 18.87,13.21L20.64,17M12,22L9.59,18.56C10.33,18.83 11.14,19 12,19C12.82,19 13.63,18.83 14.37,18.56L12,22Z"/></svg>',
+    location_on: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5M12,2A7,7 0 0,0 5,9C5,14.25 12,22 12,22C12,22 19,14.25 19,9A7,7 0 0,0 12,2Z"/></svg>',
+    nfc: '<svg class="isvg" viewBox="0 0 24 24"><path d="M7.24 2C5.6 2 3.96 2 3.55 2.04C2.67 2.09 2.08 2.73 2.04 3.56C2 4.37 2 19.59 2.04 20.41C2.09 21.23 2.71 21.86 3.55 21.91C4.46 21.96 7.44 21.97 8.29 21.97C6.76 20.91 6.55 18.92 6.41 15.23C6.33 13.04 6.4 5.36 6.41 5.04L6.45 2.94L14.5 11V13.5L8.09 7.11C8.08 8.38 8.06 10.03 8.06 11.54C8.06 13 8.08 14.34 8.12 15.05C8.36 19.07 8.74 20.96 10.83 21.7C11.5 21.93 12.07 22 13.07 22C13.89 22 19.63 22 20.45 21.96C21.33 21.91 21.93 21.27 21.97 20.44C22 19.63 22 4.45 21.97 3.62C21.91 2.8 21.29 2.18 20.45 2.13C19.54 2.08 16.57 2.03 15.71 2.03C17.24 3.09 17.44 5.08 17.59 8.78C17.67 10.97 17.6 18.64 17.59 18.97L17.55 21.06L9.53 13V10.5L15.91 16.89C15.92 15.62 15.94 13.97 15.94 12.46C15.94 11 15.92 9.66 15.88 8.96C15.64 4.93 15.26 3.04 13.17 2.3C12.53 2.07 11.93 2 10.93 2H7.24Z"/></svg>',
+    notifications_active: '<svg class="isvg" viewBox="0 0 24 24"><path d="M10,21H14A2,2 0 0,1 12,23A2,2 0 0,1 10,21M21,19V20H3V19L5,17V11C5,7.9 7.03,5.17 10,4.29C10,4.19 10,4.1 10,4A2,2 0 0,1 12,2A2,2 0 0,1 14,4C14,4.1 14,4.19 14,4.29C16.97,5.17 19,7.9 19,11V17L21,19M17,11A5,5 0 0,0 12,6A5,5 0 0,0 7,11V18H17V11M19.75,3.19L18.33,4.61C20.04,6.3 21,8.6 21,11H23C23,8.07 21.84,5.25 19.75,3.19M1,11H3C3,8.6 3.96,6.3 5.67,4.61L4.25,3.19C2.16,5.25 1,8.07 1,11Z"/></svg>',
+    open_in_new: '<svg class="isvg" viewBox="0 0 24 24"><path d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/></svg>',
+    print: '<svg class="isvg" viewBox="0 0 24 24"><path d="M18,3H6V7H18M19,12A1,1 0 0,1 18,11A1,1 0 0,1 19,10A1,1 0 0,1 20,11A1,1 0 0,1 19,12M16,19H8V14H16M19,8H5A3,3 0 0,0 2,11V17H6V21H18V17H22V11A3,3 0 0,0 19,8Z"/></svg>',
+    push_pin: '<svg class="isvg" viewBox="0 0 24 24"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12M8.8,14L10,12.8V4H14V12.8L15.2,14H8.8Z"/></svg>',
+    search: '<svg class="isvg" viewBox="0 0 24 24"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>',
+    signal_wifi_4_bar: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,3C7.79,3 3.7,4.41 0.38,7C4.41,12.06 7.89,16.37 12,21.5C16.08,16.42 20.24,11.24 23.65,7C20.32,4.41 16.22,3 12,3Z"/></svg>',
+    smartphone: '<svg class="isvg" viewBox="0 0 24 24"><path d="M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z"/></svg>',
+    star: '<svg class="isvg xs" viewBox="0 0 24 24"><path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z"/></svg>',
+    star_border: '<svg class="isvg xs" viewBox="0 0 24 24"><path d="M12,15.39L8.24,17.66L9.23,13.38L5.91,10.5L10.29,10.13L12,6.09L13.71,10.13L18.09,10.5L14.77,13.38L15.76,17.66M22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.45,13.97L5.82,21L12,17.27L18.18,21L16.54,13.97L22,9.24Z"/></svg>',
+    storage: '<svg class="isvg" viewBox="0 0 24 24"><path d="M6,2H18A2,2 0 0,1 20,4V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V4A2,2 0 0,1 6,2M12,4A6,6 0 0,0 6,10C6,13.31 8.69,16 12.1,16L11.22,13.77C10.95,13.29 11.11,12.68 11.59,12.4L12.45,11.9C12.93,11.63 13.54,11.79 13.82,12.27L15.74,14.69C17.12,13.59 18,11.9 18,10A6,6 0 0,0 12,4M12,9A1,1 0 0,1 13,10A1,1 0 0,1 12,11A1,1 0 0,1 11,10A1,1 0 0,1 12,9M7,18A1,1 0 0,0 6,19A1,1 0 0,0 7,20A1,1 0 0,0 8,19A1,1 0 0,0 7,18M12.09,13.27L14.58,19.58L17.17,18.08L12.95,12.77L12.09,13.27Z"/></svg>',
+    touch_app: '<svg class="isvg" viewBox="0 0 24 24"><path d="M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M11,5A4,4 0 0,1 15,9C15,10.5 14.2,11.77 13,12.46V11.24C13.61,10.69 14,9.89 14,9A3,3 0 0,0 11,6A3,3 0 0,0 8,9C8,9.89 8.39,10.69 9,11.24V12.46C7.8,11.77 7,10.5 7,9A4,4 0 0,1 11,5Z"/></svg>',
+    touch_app_outlined: '<svg class="isvg" viewBox="0 0 24 24"><path d="M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M11,5A4,4 0 0,1 15,9C15,10.5 14.2,11.77 13,12.46V11.24C13.61,10.69 14,9.89 14,9A3,3 0 0,0 11,6A3,3 0 0,0 8,9C8,9.89 8.39,10.69 9,11.24V12.46C7.8,11.77 7,10.5 7,9A4,4 0 0,1 11,5Z"/></svg>',
+    volume_up: '<svg class="isvg" viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/></svg>',
+    vpn_key: '<svg class="isvg" viewBox="0 0 24 24"><path d="M7 14C5.9 14 5 13.1 5 12S5.9 10 7 10 9 10.9 9 12 8.1 14 7 14M12.6 10C11.8 7.7 9.6 6 7 6C3.7 6 1 8.7 1 12S3.7 18 7 18C9.6 18 11.8 16.3 12.6 14H16V18H20V14H23V10H12.6Z"/></svg>',
+    widgets: '<svg class="isvg" viewBox="0 0 24 24"><path d="M3,3H11V7.34L16.66,1.69L22.31,7.34L16.66,13H21V21H13V13H16.66L11,7.34V11H3V3M3,13H11V21H3V13Z"/></svg>',
+    wifi: '<svg class="isvg" viewBox="0 0 24 24"><path d="M12,21L15.6,16.2C14.6,15.45 13.35,15 12,15C10.65,15 9.4,15.45 8.4,16.2L12,21M12,3C7.95,3 4.21,4.34 1.2,6.6L3,9C5.5,7.12 8.62,6 12,6C15.38,6 18.5,7.12 21,9L22.8,6.6C19.79,4.34 16.05,3 12,3M12,9C9.3,9 6.81,9.89 4.8,11.4L6.6,13.8C8.1,12.67 9.97,12 12,12C14.03,12 15.9,12.67 17.4,13.8L19.2,11.4C17.19,9.89 14.7,9 12,9Z"/></svg>'
+  };
+
+  var chipsEl = document.getElementById('chips');
+  var gridEl = document.getElementById('grid');
+  var qEl = document.getElementById('q');
+  var sheetEl = document.getElementById('sheet');
+  var scrimEl = document.getElementById('scrim');
+  var toastEl = document.getElementById('toast');
+
+  function toast(msg){
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    setTimeout(function(){ toastEl.classList.remove('show'); }, 2400);
+  }
+  function closeSheet(){ sheetEl.classList.remove('open'); scrimEl.classList.remove('open'); }
+  function byTitle(t){ return DATA.filter(function(d){ return d.title === t; })[0]; }
+
+  function cardHtml(d){
+    var marks = '';
+    if (S.favs.indexOf(d.title) > -1) marks += '<span class="starbadge">' + ICONS.star + '</span>';
+    if (tileTitle === d.title) marks += '<span class="tilebadge">' + ICONS.widgets + '</span>';
+    return '<div class="toprow"><div class="ic">' + ICONS[d.icon] + '</div>' +
+      '<div class="sp"></div><div class="mk">' + marks + '</div></div>' +
+      '<div class="t">' + d.title + '</div>' +
+      '<div class="d">' + d.desc + '</div>' +
+      (d.live ? '<div class="livedot"><span class="dot"></span>' + d.live + '</div>' : '');
+  }
+
+  function openTool(d){
+    var i = S.recents.indexOf(d.title);
+    if (i > -1) S.recents.splice(i, 1);
+    S.recents.unshift(d.title);
+    S.recents = S.recents.slice(0, 8);
+    save(); renderAll();
+    toast('Membuka halaman "' + d.title + '"…');
+  }
+
+  function bindCard(el, d){
+    el.addEventListener('pointerdown', function(){
+      pressTimer = setTimeout(function(){
+        sheetFor = d;
+        document.getElementById('sOpenT').textContent = 'Buka "' + d.title + '"';
+        var isFav = S.favs.indexOf(d.title) > -1;
+        document.getElementById('sFavT').textContent = isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit';
+        document.getElementById('sFavI').innerHTML = isFav ? ICONS.star : ICONS.star_border;
+        sheetEl.classList.add('open'); scrimEl.classList.add('open');
+      }, 550);
+    });
+    ['pointerup','pointerleave','pointercancel'].forEach(function(ev){
+      el.addEventListener(ev, function(){ clearTimeout(pressTimer); });
+    });
+    el.addEventListener('click', function(){ openTool(d); });
+  }
+
+  function stripHtml(secId, headIcon, headTitle, clearBtn, items){
+    var sec = document.getElementById(secId);
+    sec.innerHTML = '';
+    if (!items.length) return;
+    var html = '<div class="striphead">' + ICONS[headIcon] + headTitle +
+      '<div class="sp"></div>' + (clearBtn ? '<button id="' + secId + 'Clear">Hapus</button>' : '') + '</div>' +
+      '<div class="strip" id="' + secId + 'Row"></div><hr class="div">';
+    sec.innerHTML = html;
+    var row = document.getElementById(secId + 'Row');
+    items.forEach(function(d){
+      var el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = cardHtml(d);
+      bindCard(el, d);
+      row.appendChild(el);
+    });
+    if (clearBtn) document.getElementById(secId + 'Clear').onclick = function(){
+      S.recents = []; save(); renderAll();
+    };
+  }
+
+  function renderChips(){
+    chipsEl.innerHTML = '';
+    CATS.forEach(function(c){
+      var b = document.createElement('button');
+      b.className = 'chip' + (S.cat === c ? ' on' : '');
+      b.textContent = c;
+      b.onclick = function(){ S.cat = c; save(); renderChips(); renderAll(); };
+      chipsEl.appendChild(b);
+    });
+  }
+
+  function renderAll(){
+    stripHtml('recentsec', 'history', 'Terakhir dibuka', true,
+      S.recents.map(byTitle).filter(Boolean));
+    stripHtml('favsec', 'star', 'Favorit', false,
+      S.favs.map(byTitle).filter(Boolean));
+    gridEl.innerHTML = '';
+    var q = S.q.trim().toLowerCase();
+    var items = DATA.filter(function(d){
+      return (S.cat === 'Semua' || d.cat === S.cat) &&
+             (!q || d.title.toLowerCase().indexOf(q) > -1 || d.desc.toLowerCase().indexOf(q) > -1);
+    });
+    items.forEach(function(d){
+      var el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = cardHtml(d);
+      bindCard(el, d);
+      gridEl.appendChild(el);
+    });
+    if (!items.length) gridEl.innerHTML = '<div class="empty">Tidak ada hasil.</div>';
+  }
+
+  document.getElementById('sOpen').onclick = function(){ closeSheet(); openTool(sheetFor); };
+  document.getElementById('sFav').onclick = function(){
+    closeSheet();
+    var i = S.favs.indexOf(sheetFor.title);
+    if (i > -1) { S.favs.splice(i, 1); toast('"' + sheetFor.title + '" dihapus dari Favorit'); }
+    else { S.favs.push(sheetFor.title); toast('"' + sheetFor.title + '" ditambah ke Favorit'); }
+    save(); renderAll();
+  };
+  document.getElementById('sPin').onclick = function(){ closeSheet(); toast('Ikuti dialog sistem untuk pin "' + sheetFor.title + '" ke Home Screen'); };
+  document.getElementById('sTile').onclick = function(){
+    closeSheet(); tileTitle = sheetFor.title; renderAll();
+    toast('"' + sheetFor.title + '" dipasang sebagai Quick Tile — tambahkan lewat Edit tiles');
+  };
+  scrimEl.onclick = closeSheet;
+
+  qEl.value = S.q;
+  qEl.addEventListener('input', function(){ S.q = qEl.value; save(); renderAll(); });
+
+  renderChips(); renderAll(); applyTheme();
+})();
+</script>
+</body>
+</html>

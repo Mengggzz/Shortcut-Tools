@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Ikon: 4 tombol grid (mewakili pintasan) -->
+    <path
+        android:fillColor="#006A60"
+        android:pathData="M28,28h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="#006A60"
+        android:pathData="M60,28h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="#006A60"
+        android:pathData="M28,60h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60,60h20a8,8 0 0 1 8,8v20a8,8 0 0 1 -8,8h-20a8,8 0 0 1 -8,-8v-20a8,8 0 0 1 8,-8z" />
+</vector>
