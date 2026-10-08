@@ -7,6 +7,8 @@ import '../services/onboarding_service.dart';
 import '../services/recents_service.dart';
 import '../services/shortcut_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/dns_manager_sheet.dart';
+import '../widgets/tool_detail_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -134,6 +136,22 @@ class _HomeScreenState extends State<HomeScreen> {
           s.keywords.any((k) => k.toLowerCase().contains(q));
       return matchCat && matchQuery;
     }).toList();
+  }
+
+  void _onCardTap(ToolShortcut s) {
+    if (s.id == 'private_dns') {
+      DnsManagerSheet.show(
+        context,
+        shortcut: s,
+        onOpenNativeSettings: () => _open(s),
+      );
+    } else {
+      ToolDetailSheet.show(
+        context,
+        shortcut: s,
+        onOpenNativeSettings: () => _open(s),
+      );
+    }
   }
 
   Future<void> _open(ToolShortcut s) async {
@@ -369,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       shortcut: _filtered[i],
                       isTile: _tileId == _filtered[i].id,
                       isFav: _favIds.contains(_filtered[i].id),
-                      onTap: () => _open(_filtered[i]),
+                      onTap: () => _onCardTap(_filtered[i]),
                       onLongPress: () => _showActions(_filtered[i]),
                     ),
                   ),
@@ -396,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
             shortcut: items[i],
             isTile: _tileId == items[i].id,
             isFav: _favIds.contains(items[i].id),
-            onTap: () => _open(items[i]),
+            onTap: () => _onCardTap(items[i]),
             onLongPress: () => _showActions(items[i]),
           ),
         ),

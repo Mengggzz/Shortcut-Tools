@@ -37,9 +37,9 @@ class ShortcutService {
         'action': action,
         'fallbacks': fallbacks,
         'dataUri': ?dataUri,
-      });
+      }).timeout(const Duration(seconds: 2));
       return ok ?? false;
-    } on PlatformException {
+    } catch (_) {
       return false;
     }
   }
@@ -48,8 +48,10 @@ class ShortcutService {
   /// Tidak butuh permission khusus untuk key yang readable.
   Future<String?> getGlobalSetting(String key) async {
     try {
-      return await _channel.invokeMethod<String>('getGlobalSetting', {'key': key});
-    } on PlatformException {
+      return await _channel
+          .invokeMethod<String>('getGlobalSetting', {'key': key})
+          .timeout(const Duration(seconds: 1));
+    } catch (_) {
       return null;
     }
   }
@@ -65,9 +67,9 @@ class ShortcutService {
         'action': shortcut.action,
         'fallbacks': shortcut.fallbacks,
         if (shortcut.dataUri != null) 'dataUri': shortcut.dataUri,
-      });
+      }).timeout(const Duration(seconds: 2));
       return ok ?? false;
-    } on PlatformException {
+    } catch (_) {
       return false;
     }
   }
@@ -83,8 +85,8 @@ class ShortcutService {
         'action': shortcut.action,
         'fallbacks': shortcut.fallbacks,
         if (shortcut.dataUri != null) 'dataUri': shortcut.dataUri,
-      });
-    } on PlatformException {
+      }).timeout(const Duration(seconds: 1));
+    } catch (_) {
       // Abaikan — tile sekadar tidak terupdate.
     }
   }
@@ -92,8 +94,10 @@ class ShortcutService {
   /// ID shortcut yang saat ini dipasang sebagai Quick Settings Tile.
   Future<String?> getTileShortcutId() async {
     try {
-      return await _channel.invokeMethod<String>('getTileShortcutId');
-    } on PlatformException {
+      return await _channel
+          .invokeMethod<String>('getTileShortcutId')
+          .timeout(const Duration(seconds: 1));
+    } catch (_) {
       return null;
     }
   }
@@ -102,8 +106,10 @@ class ShortcutService {
   /// Dipanggil sekali saat aplikasi start; null bila dibuka normal.
   Future<Map<String, dynamic>?> consumePinnedShortcut() async {
     try {
-      return await _channel.invokeMapMethod<String, dynamic>('consumePinnedShortcut');
-    } on PlatformException {
+      return await _channel
+          .invokeMapMethod<String, dynamic>('consumePinnedShortcut')
+          .timeout(const Duration(seconds: 1));
+    } catch (_) {
       return null;
     }
   }
@@ -112,9 +118,55 @@ class ShortcutService {
   /// Dipanggil setelah favorit berubah.
   Future<void> refreshWidgets() async {
     try {
-      await _channel.invokeMethod('refreshWidgets');
-    } on PlatformException {
+      await _channel
+          .invokeMethod('refreshWidgets')
+          .timeout(const Duration(seconds: 1));
+    } catch (_) {
       // Abaikan — widget sekadar tidak terupdate.
+    }
+  }
+
+  /// Ambil info spesifikasi perangkat & status sistem live.
+  Future<Map<String, dynamic>> getSystemInfo() async {
+    try {
+      final map = await _channel
+          .invokeMapMethod<String, dynamic>('getSystemInfo')
+          .timeout(const Duration(milliseconds: 1200));
+      return map ?? {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Ukur latensi ping ke host/DNS dalam milidetik (-1 jika gagal/timeout).
+  Future<int> pingHost(String host, {int timeout = 2500}) async {
+    try {
+      final res = await _channel.invokeMethod<int>('pingHost', {
+        'host': host,
+        'timeout': timeout,
+      }).timeout(Duration(milliseconds: timeout + 1000));
+      return res ?? -1;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  /// Terapkan Private DNS secara programatik (memerlukan WRITE_SECURE_SETTINGS).
+  Future<Map<String, dynamic>> setPrivateDns({
+    required String mode,
+    String? hostname,
+  }) async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(
+        'setPrivateDns',
+        {
+          'mode': mode,
+          'hostname': ?hostname,
+        },
+      ).timeout(const Duration(seconds: 2));
+      return res ?? {'success': false, 'error': 'UNKNOWN'};
+    } catch (e) {
+      return {'success': false, 'error': 'FAILED', 'message': e.toString()};
     }
   }
 

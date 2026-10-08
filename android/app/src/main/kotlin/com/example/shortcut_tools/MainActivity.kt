@@ -1,18 +1,30 @@
 package com.example.shortcut_tools
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private val channelName = "tools/shortcut"
+    private val executor = Executors.newCachedThreadPool()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // Ekstra intent dari pinned shortcut di home screen.
     private var pendingAction: String? = null
@@ -39,6 +51,25 @@ class MainActivity : FlutterActivity() {
                         } catch (e: Exception) {
                             result.error("READ_FAILED", e.message, null)
                         }
+                    }
+                    "getSystemInfo" -> {
+                        result.success(getSystemInfoMap())
+                    }
+                    "pingHost" -> {
+                        val host = call.argument<String>("host").orEmpty()
+                        val timeout = call.argument<Int>("timeout") ?: 2500
+                        executor.execute {
+                            val latency = measurePingLatency(host, timeout)
+                            mainHandler.post {
+                                result.success(latency)
+                            }
+                        }
+                    }
+                    "setPrivateDns" -> {
+                        val mode = call.argument<String>("mode").orEmpty()
+                        val hostname = call.argument<String>("hostname")
+                        val res = applyPrivateDns(mode, hostname)
+                        result.success(res)
                     }
                     "pinShortcut" -> {
                         val id = call.argument<String>("id").orEmpty()
@@ -99,7 +130,22 @@ class MainActivity : FlutterActivity() {
             .distinct()
         for (a in candidates) {
             try {
-                val intent = Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val intent = if (a.contains("/")) {
+                    val parts = a.split("/")
+                    val pkg = parts[0]
+                    val cls = if (parts[1].startsWith(".")) pkg + parts[1] else parts[1]
+                    Intent().setClassName(pkg, cls).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                } else {
+                    Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                if (action.contains("PRIVATE_DNS", ignoreCase = true) || a.contains("DNS", ignoreCase = true)) {
+                    intent.putExtra(":settings:show_fragment", "com.android.settings.network.PrivateDnsSettings")
+                    intent.putExtra(":settings:show_fragment_args", "private_dns_settings")
+                    intent.putExtra(":settings:fragment_args_key", "private_dns_settings")
+                    intent.putExtra("extra_prefs_show_button_bar", true)
+                }
+
                 if (dataUri != null) intent.data = Uri.parse(dataUri)
                 if (intent.resolveActivity(packageManager) != null) {
                     startActivity(intent)
@@ -110,6 +156,95 @@ class MainActivity : FlutterActivity() {
             }
         }
         return false
+    }
+
+    // ── System Info & Tools ────────────────────────────────────────────
+
+    private fun getSystemInfoMap(): Map<String, Any?> {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val batteryPct = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+        val isCharging = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val status = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS) ?: -1
+            status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        } else false
+
+        val hasWriteSecure = checkCallingOrSelfPermission(
+            Manifest.permission.WRITE_SECURE_SETTINGS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val dnsMode = try {
+            Settings.Global.getString(contentResolver, "private_dns_mode") ?: ""
+        } catch (_: Exception) { "" }
+
+        val dnsSpecifier = try {
+            Settings.Global.getString(contentResolver, "private_dns_specifier") ?: ""
+        } catch (_: Exception) { "" }
+
+        return mapOf(
+            "manufacturer" to Build.MANUFACTURER,
+            "brand" to Build.BRAND,
+            "model" to Build.MODEL,
+            "device" to Build.DEVICE,
+            "androidVersion" to Build.VERSION.RELEASE,
+            "sdkInt" to Build.VERSION.SDK_INT,
+            "batteryPercent" to batteryPct,
+            "isCharging" to isCharging,
+            "hasWriteSecureSettings" to hasWriteSecure,
+            "privateDnsMode" to dnsMode,
+            "privateDnsSpecifier" to dnsSpecifier,
+        )
+    }
+
+    private fun measurePingLatency(host: String, timeoutMs: Int): Int {
+        val cleanHost = host.trim().removePrefix("https://").removePrefix("http://").split("/")[0]
+        if (cleanHost.isEmpty()) return -1
+        val start = System.currentTimeMillis()
+        return try {
+            val inet = InetAddress.getByName(cleanHost)
+            if (inet.isReachable(timeoutMs)) {
+                (System.currentTimeMillis() - start).toInt()
+            } else {
+                val socket = Socket()
+                val socketAddress = InetSocketAddress(inet, 853)
+                socket.connect(socketAddress, timeoutMs)
+                socket.close()
+                (System.currentTimeMillis() - start).toInt()
+            }
+        } catch (_: Exception) {
+            try {
+                val socket = Socket()
+                val socketAddress = InetSocketAddress(cleanHost, 443)
+                socket.connect(socketAddress, timeoutMs)
+                socket.close()
+                (System.currentTimeMillis() - start).toInt()
+            } catch (_: Exception) {
+                -1
+            }
+        }
+    }
+
+    private fun applyPrivateDns(mode: String, hostname: String?): Map<String, Any?> {
+        val hasWriteSecure = checkCallingOrSelfPermission(
+            Manifest.permission.WRITE_SECURE_SETTINGS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasWriteSecure) {
+            return mapOf(
+                "success" to false,
+                "error" to "PERMISSION_DENIED",
+                "message" to "Membutuhkan izin WRITE_SECURE_SETTINGS."
+            )
+        }
+
+        return try {
+            Settings.Global.putString(contentResolver, "private_dns_mode", mode)
+            if (mode == "hostname" && !hostname.isNullOrBlank()) {
+                Settings.Global.putString(contentResolver, "private_dns_specifier", hostname.trim())
+            }
+            mapOf("success" to true)
+        } catch (e: Exception) {
+            mapOf("success" to false, "error" to e.javaClass.simpleName, "message" to e.message)
+        }
     }
 
     // ── Pin to Home Screen (Android 8+) ────────────────────────────────

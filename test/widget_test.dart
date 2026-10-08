@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shortcut_tools/data/shortcuts_catalog.dart';
@@ -10,6 +11,37 @@ import 'package:shortcut_tools/services/theme_service.dart';
 
 void main() {
   setUp(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('tools/shortcut'),
+      (MethodCall call) async {
+        if (call.method == 'getSystemInfo') {
+          return {
+            'manufacturer': 'Infinix',
+            'brand': 'Infinix',
+            'model': 'X6833B',
+            'androidVersion': '14',
+            'sdkInt': 34,
+            'batteryPercent': 64,
+            'isCharging': false,
+            'hasWriteSecureSettings': false,
+            'privateDnsMode': 'hostname',
+            'privateDnsSpecifier': 'p2.freedns.controld.com',
+          };
+        }
+        if (call.method == 'getGlobalSetting') {
+          return 'hostname';
+        }
+        if (call.method == 'getTileShortcutId') {
+          return null;
+        }
+        if (call.method == 'consumePinnedShortcut') {
+          return null;
+        }
+        return true;
+      },
+    );
     SharedPreferences.setMockInitialValues({});
     await ThemeService.instance.init();
     await OnboardingService.instance.markSeen();
@@ -86,5 +118,26 @@ void main() {
 
     await rec.clear();
     expect(await rec.getRecents(), isEmpty);
+  });
+
+  testWidgets('Tapping Private DNS opens DnsManagerSheet with presets',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const ShortcutToolsApp());
+    await tester.pumpAndSettle();
+
+    // Tap Private DNS card
+    await tester.tap(find.text('Private DNS'));
+    await tester.pumpAndSettle();
+
+    // Verify DnsManagerSheet content
+    expect(find.text('DNS Pribadi (Private DNS)'), findsOneWidget);
+    expect(find.text('Control D (Adblock & Tracking)'), findsOneWidget);
+    expect(find.text('Control D (Family Friendly)'), findsOneWidget);
+    expect(find.text('AdGuard DNS'), findsOneWidget);
   });
 }
